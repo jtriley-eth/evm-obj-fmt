@@ -17,3 +17,11 @@ impl TryFrom<u8> for Version {
         }
     }
 }
+
+impl From<Version> for u8 {
+    fn from(version: Version) -> Self {
+        match version {
+            Version::V1 => 1,
+        }
+    }
+}

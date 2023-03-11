@@ -82,86 +82,105 @@ pub const DEFAULT_HEADER: RawHeader = [
 
 /// EOF Header
 pub struct Header {
-    /// EOF Version
-    version: u8,
-    /// Type Section Size
-    type_section_size: u16,
-    /// Number of Code Sections
-    number_of_code_sections: u16,
-    /// Code Section Size
-    code_section_size: u16,
-    /// Data Section Size
-    data_section_size: u16,
+    raw: RawHeader,
 }
 
 impl Header {
+    /// Returns the raw header
+    pub fn raw(&self) -> RawHeader {
+        self.raw
+    }
+
     /// Returns Total Code Size
-    pub fn codesize(&self) -> usize {
-        HEADER_SIZE
-            + self.type_section_size as usize
-            + self.code_section_size as usize
-            + self.data_section_size as usize
+    pub fn codesize(&self) -> u64 {
+        HEADER_SIZE as u64
+            + self.type_section_size() as u64
+            + self.code_section_size() as u64
+            + self.data_section_size() as u64
     }
 
     /// Returns the version
-    pub fn version(&self) -> Result<Version, Error> {
-        Version::try_from(self.version)
+    pub fn version(&self) -> Version {
+        Version::try_from(self.raw[VERSION_INDEX])
+            .expect("invalid version (this should never happen")
     }
 
     /// Returns the type section size
     pub fn type_section_size(&self) -> u16 {
-        self.type_section_size
+        let upper_bits = (self.raw[TYPE_SECTION_SIZE_INDEX_0] as u16) << 8;
+        upper_bits | self.raw[TYPE_SECTION_SIZE_INDEX_1] as u16
     }
 
     /// Returns the number of code sections
     pub fn number_of_code_sections(&self) -> u16 {
-        self.number_of_code_sections
+        let upper_bits = (self.raw[NUMBER_OF_CODE_SECTIONS_INDEX_0] as u16) << 8;
+        upper_bits | self.raw[NUMBER_OF_CODE_SECTIONS_INDEX_1] as u16
     }
 
     /// Returns the code section size
     pub fn code_section_size(&self) -> u16 {
-        self.code_section_size
+        let upper_bits = (self.raw[CODE_SECTION_SIZE_INDEX_0] as u16) << 8;
+        upper_bits | self.raw[CODE_SECTION_SIZE_INDEX_1] as u16
     }
 
     /// Returns the data section size
     pub fn data_section_size(&self) -> u16 {
-        self.data_section_size
+        let upper_bits = (self.raw[DATA_SECTION_SIZE_INDEX_0] as u16) << 8;
+        upper_bits | self.raw[DATA_SECTION_SIZE_INDEX_1] as u16
     }
 }
 
-impl TryFrom<RawHeader> for Header {
-    type Error = Error;
+pub struct HeaderBuilder {
+    header: Header,
+}
 
-    fn try_from(value: RawHeader) -> Result<Self, Self::Error> {
-        let _ = Version::try_from(value[VERSION_INDEX])?;
+impl HeaderBuilder {
+    /// Creates a new HeaderBuilder
+    pub fn new() -> Self {
+        Self {
+            header: Header {
+                raw: DEFAULT_HEADER,
+            },
+        }
+    }
 
-        let type_section_size: u16 = u16::from_be_bytes([
-            value[TYPE_SECTION_SIZE_INDEX_0],
-            value[TYPE_SECTION_SIZE_INDEX_1],
-        ]);
+    /// Sets the version
+    pub fn version(mut self, version: Version) -> Self {
+        self.header.raw[VERSION_INDEX] = version.into();
+        self
+    }
 
-        let number_of_code_sections: u16 = u16::from_be_bytes([
-            value[NUMBER_OF_CODE_SECTIONS_INDEX_0],
-            value[NUMBER_OF_CODE_SECTIONS_INDEX_1],
-        ]);
+    /// Sets the type section size
+    pub fn type_section_size(mut self, size: u16) -> Self {
+        self.header.raw[TYPE_SECTION_SIZE_INDEX_0] = (size >> 8) as u8;
+        self.header.raw[TYPE_SECTION_SIZE_INDEX_1] = size as u8;
+        self
+    }
 
-        let code_section_size: u16 = u16::from_be_bytes([
-            value[CODE_SECTION_SIZE_INDEX_0],
-            value[CODE_SECTION_SIZE_INDEX_1],
-        ]);
+    /// Sets the number of code sections
+    pub fn number_of_code_sections(mut self, number: u16) -> Self {
+        self.header.raw[NUMBER_OF_CODE_SECTIONS_INDEX_0] = (number >> 8) as u8;
+        self.header.raw[NUMBER_OF_CODE_SECTIONS_INDEX_1] = number as u8;
+        self
+    }
 
-        let data_section_size: u16 = u16::from_be_bytes([
-            value[DATA_SECTION_SIZE_INDEX_0],
-            value[DATA_SECTION_SIZE_INDEX_1],
-        ]);
+    /// Sets the code section size
+    pub fn code_section_size(mut self, size: u16) -> Self {
+        self.header.raw[CODE_SECTION_SIZE_INDEX_0] = (size >> 8) as u8;
+        self.header.raw[CODE_SECTION_SIZE_INDEX_1] = size as u8;
+        self
+    }
 
-        Ok(Header {
-            version: value[VERSION_INDEX],
-            type_section_size,
-            number_of_code_sections,
-            code_section_size,
-            data_section_size,
-        })
+    /// Sets the data section size
+    pub fn data_section_size(mut self, size: u16) -> Self {
+        self.header.raw[DATA_SECTION_SIZE_INDEX_0] = (size >> 8) as u8;
+        self.header.raw[DATA_SECTION_SIZE_INDEX_1] = size as u8;
+        self
+    }
+
+    /// Builds the Header
+    pub fn build(self) -> Header {
+        self.header
     }
 }
 
@@ -170,138 +189,114 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_create_header_from_raw() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
+    fn test_header() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0102)
+            .number_of_code_sections(0x0001)
+            .code_section_size(0x0304)
+            .data_section_size(0x0506)
+            .build();
 
-        let header = Header::try_from(raw).unwrap();
-
-        assert_eq!(header.version(), Ok(Version::V1));
-        assert_eq!(header.type_section_size(), 0);
-        assert_eq!(header.number_of_code_sections(), 0);
-        assert_eq!(header.code_section_size(), 0);
-        assert_eq!(header.data_section_size(), 0);
+        assert_eq!(header.version(), Version::V1);
+        assert_eq!(header.type_section_size(), 0x0102);
+        assert_eq!(header.number_of_code_sections(), 0x0001);
+        assert_eq!(header.code_section_size(), 0x0304);
+        assert_eq!(header.data_section_size(), 0x0506);
     }
 
     #[test]
-    fn can_get_codesize() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_1] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_1] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_1] = 0x01;
+    fn test_header_codesize() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().codesize(), 3 + HEADER_SIZE);
+        assert_eq!(header.codesize(), 15);
     }
 
     #[test]
-    fn can_get_two_byte_codesize() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_1] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_1] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_1] = 0x01;
+    fn test_header_codesize_with_type_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0001)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().codesize(), 0x0303 + HEADER_SIZE);
+        assert_eq!(header.codesize(), 16);
     }
 
     #[test]
-    fn can_get_version() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[VERSION_INDEX] = 0x01;
+    fn test_header_codesize_with_code_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .number_of_code_sections(0x0001)
+            .code_section_size(0x0001)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().version(), Ok(Version::V1));
+        assert_eq!(header.codesize(), 16);
     }
 
     #[test]
-    fn cant_get_invalid_version() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[VERSION_INDEX] = 0x02;
+    fn test_header_codesize_with_data_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0000)
+            .number_of_code_sections(0x0000)
+            .code_section_size(0x0000)
+            .data_section_size(0x0001)
+            .build();
 
-        assert!(Header::try_from(raw).is_err());
+        assert_eq!(header.codesize(), 16);
     }
 
     #[test]
-    fn can_get_type_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_1] = 0x01;
+    fn test_header_codesize_with_type_and_code_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0001)
+            .number_of_code_sections(0x0001)
+            .code_section_size(0x0001)
+            .data_section_size(0x0000)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().type_section_size(), 1);
+        assert_eq!(header.codesize(), 17);
     }
 
     #[test]
-    fn can_get_two_byte_type_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[TYPE_SECTION_SIZE_INDEX_1] = 0x01;
+    fn test_header_codesize_with_type_and_data_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0001)
+            .number_of_code_sections(0x0000)
+            .code_section_size(0x0000)
+            .data_section_size(0x0001)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().type_section_size(), 0x0101);
+        assert_eq!(header.codesize(), 17);
     }
 
     #[test]
-    fn can_get_number_of_code_sections() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[NUMBER_OF_CODE_SECTIONS_INDEX_1] = 0x01;
+    fn test_header_codesize_with_code_and_data_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0000)
+            .number_of_code_sections(0x0001)
+            .code_section_size(0x0001)
+            .data_section_size(0x0001)
+            .build();
 
-        assert_eq!(Header::try_from(raw).unwrap().number_of_code_sections(), 1);
+        assert_eq!(header.codesize(), 17);
     }
 
     #[test]
-    fn can_get_two_byte_number_of_code_sections() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[NUMBER_OF_CODE_SECTIONS_INDEX_0] = 0x01;
-        raw[NUMBER_OF_CODE_SECTIONS_INDEX_1] = 0x01;
+    fn test_header_codesize_with_type_code_and_data_section() {
+        let header = HeaderBuilder::new()
+            .version(Version::V1)
+            .type_section_size(0x0001)
+            .number_of_code_sections(0x0001)
+            .code_section_size(0x0001)
+            .data_section_size(0x0001)
+            .build();
 
-        assert_eq!(
-            Header::try_from(raw).unwrap().number_of_code_sections(),
-            0x0101
-        );
-    }
-
-    #[test]
-    fn can_get_code_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_1] = 0x01;
-
-        assert_eq!(Header::try_from(raw).unwrap().code_section_size(), 1);
-    }
-
-    #[test]
-    fn can_get_two_byte_code_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[CODE_SECTION_SIZE_INDEX_1] = 0x01;
-
-        assert_eq!(Header::try_from(raw).unwrap().code_section_size(), 0x0101);
-    }
-
-    #[test]
-    fn can_get_data_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_1] = 0x01;
-
-        assert_eq!(Header::try_from(raw).unwrap().data_section_size(), 1);
-    }
-
-    #[test]
-    fn can_get_two_byte_data_section_size() {
-        let mut raw = DEFAULT_HEADER;
-        raw[VERSION_INDEX] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_0] = 0x01;
-        raw[DATA_SECTION_SIZE_INDEX_1] = 0x01;
-
-        assert_eq!(Header::try_from(raw).unwrap().data_section_size(), 0x0101);
+        assert_eq!(header.codesize(), 18);
     }
 }
