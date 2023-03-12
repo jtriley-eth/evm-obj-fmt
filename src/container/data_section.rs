@@ -3,7 +3,7 @@
 /// This contains a vector of unstructured, immediate bytes.
 pub struct DataSection {
     /// Immediate bytes
-    immediates: Vec<u8>,
+    immediates: &[u8],
 }
 
 impl DataSection {

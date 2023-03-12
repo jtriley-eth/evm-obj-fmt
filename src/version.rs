@@ -13,11 +13,12 @@ impl TryFrom<u8> for Version {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Version::V1),
-            _ => Err(Error::InvalidVersion),
+            _ => Err(Error::Version),
         }
     }
 }
 
+// TODO: do we need both of these?
 impl From<Version> for u8 {
     fn from(version: Version) -> Self {
         match version {

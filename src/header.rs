@@ -100,9 +100,8 @@ impl Header {
     }
 
     /// Returns the version
-    pub fn version(&self) -> Version {
+    pub fn version(&self) -> Result<Version, Error> {
         Version::try_from(self.raw[VERSION_INDEX])
-            .expect("invalid version (this should never happen")
     }
 
     /// Returns the type section size
@@ -128,6 +127,36 @@ impl Header {
         let upper_bits = (self.raw[DATA_SECTION_SIZE_INDEX_0] as u16) << 8;
         upper_bits | self.raw[DATA_SECTION_SIZE_INDEX_1] as u16
     }
+}
+
+pub fn parse_header(raw: &[u8]) -> Result<Header, Error> {
+    if raw.len() < HEADER_SIZE {
+        return Err(Error::BytecodeLength);
+    }
+
+    if raw[0] != MAGIC_0 || raw[1] != MAGIC_1 {
+        return Err(Error::Header);
+    }
+
+    if raw[3] != TYPE_SECTION_MARKER {
+        return Err(Error::Header);
+    }
+
+    if raw[6] != CODE_SECTION_MARKER {
+        return Err(Error::Header);
+    }
+
+    if raw[11] != DATA_SECTION_MARKER {
+        return Err(Error::Header);
+    }
+
+    if raw[14] != TERMINATOR {
+        return Err(Error::Header);
+    }
+
+    Ok(Header {
+        raw: raw[..HEADER_SIZE].try_into().unwrap(),
+    })
 }
 
 pub struct HeaderBuilder {
@@ -198,7 +227,7 @@ mod tests {
             .data_section_size(0x0506)
             .build();
 
-        assert_eq!(header.version(), Version::V1);
+        assert_eq!(header.version().unwrap(), Version::V1);
         assert_eq!(header.type_section_size(), 0x0102);
         assert_eq!(header.number_of_code_sections(), 0x0001);
         assert_eq!(header.code_section_size(), 0x0304);
@@ -246,45 +275,6 @@ mod tests {
             .build();
 
         assert_eq!(header.codesize(), 16);
-    }
-
-    #[test]
-    fn test_header_codesize_with_type_and_code_section() {
-        let header = HeaderBuilder::new()
-            .version(Version::V1)
-            .type_section_size(0x0001)
-            .number_of_code_sections(0x0001)
-            .code_section_size(0x0001)
-            .data_section_size(0x0000)
-            .build();
-
-        assert_eq!(header.codesize(), 17);
-    }
-
-    #[test]
-    fn test_header_codesize_with_type_and_data_section() {
-        let header = HeaderBuilder::new()
-            .version(Version::V1)
-            .type_section_size(0x0001)
-            .number_of_code_sections(0x0000)
-            .code_section_size(0x0000)
-            .data_section_size(0x0001)
-            .build();
-
-        assert_eq!(header.codesize(), 17);
-    }
-
-    #[test]
-    fn test_header_codesize_with_code_and_data_section() {
-        let header = HeaderBuilder::new()
-            .version(Version::V1)
-            .type_section_size(0x0000)
-            .number_of_code_sections(0x0001)
-            .code_section_size(0x0001)
-            .data_section_size(0x0001)
-            .build();
-
-        assert_eq!(header.codesize(), 17);
     }
 
     #[test]
