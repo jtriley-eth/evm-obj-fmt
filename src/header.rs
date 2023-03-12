@@ -1,8 +1,8 @@
 use crate::{error::Error, version::Version};
 
-const HEADER_SIZE: usize = 15;
+pub const HEADER_SIZE: usize = 15;
 
-const DEFAULT_MASK: u128 = 0x00_ef_00_00_01_00_00_02_00_00_00_00_03_00_00_00;
+pub const DEFAULT_MASK: u128 = 0x00_ef_00_00_01_00_00_02_00_00_00_00_03_00_00_00;
 
 const VERSION_MASK: u128 = 0x00_00_00_ff_00_00_00_00_00_00_00_00_00_00_00_00;
 const TYPE_SECTION_SIZE_MASK: u128 = 0x00_00_00_00_00_ff_ff_00_00_00_00_00_00_00_00_00;
@@ -49,24 +49,9 @@ impl Header {
 
 impl From<&[u8]> for Header {
     fn from(value: &[u8]) -> Self {
-        if value.len() < HEADER_SIZE {
-            // TODO: remove panic
-            panic!("bytecode len")
-        }
-
         Header(u128::from_be_bytes([
             0x00, value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7],
             value[8], value[9], value[10], value[11], value[12], value[13], value[14],
         ]))
-    }
-}
-
-pub fn parse_header(raw: &[u8]) -> Result<Header, Error> {
-    let header = Header::from(raw);
-
-    return if header.0 & 0xff_u128 != 0 || header.0 & DEFAULT_MASK != DEFAULT_MASK {
-        return Err(Error::Header);
-    } else {
-        Ok(header)
     }
 }

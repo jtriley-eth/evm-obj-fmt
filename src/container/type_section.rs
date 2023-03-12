@@ -14,10 +14,7 @@ impl TypeSection {
     /// Create type section from reference to functions.
     pub fn new(functions: &[Function]) -> Self {
         Self {
-            types: functions
-                .iter()
-                .map(|fun| fun.into())
-                .collect(),
+            types: functions.iter().map(|fun| fun.into()).collect(),
         }
     }
 }
@@ -34,5 +31,14 @@ impl<'a> From<&Function<'a>> for FunctionMetadata {
         (value.inputs() as u32) << 24
             | (value.outputs() as u32) << 16
             | (value.max_stack_height() as u32)
+    }
+}
+
+impl From<&[u8]> for FunctionMetadata {
+    fn from(value: &[u8]) -> Self {
+        (value[0] as u32) << 24
+            | ((value[1] as u32) << 16)
+            | ((value[2] as u32) << 8)
+            | (value[3] as u32)
     }
 }

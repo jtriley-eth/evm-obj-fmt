@@ -11,4 +11,6 @@ pub enum Error {
     BytecodeLength,
     /// Not an EOF Container
     NotEOF,
+    /// Type Section Malformed
+    TypeSection,
 }
