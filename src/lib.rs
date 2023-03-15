@@ -3,3 +3,4 @@ pub mod instruction;
 pub mod error;
 pub mod header;
 pub mod version;
+pub mod parser;

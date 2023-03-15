@@ -3,7 +3,7 @@
 pub enum Error {
     /// Invalid Version
     Version,
-    /// Invalid Raw Header
+    /// Invalid Header
     Header,
     /// OpCode Required Immediates Mismatch
     OpCodeImmediates,
@@ -12,5 +12,11 @@ pub enum Error {
     /// Not an EOF Container
     NotEOF,
     /// Type Section Malformed
-    TypeSection,
+    TypeSectionMalformed,
+    /// Number of Code Sections Mismatch with Type Section
+    NumberOfCodeSections,
+    /// Code Section Metadata Mismatch with Type Section
+    CodeSectionMetadata,
+    /// First Code Section MUST Have 0 Inputs and 0 Outputs
+    FirstCodeSection,
 }

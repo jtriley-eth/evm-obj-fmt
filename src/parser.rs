@@ -1,51 +1,60 @@
 use crate::{
     container::type_section::FunctionMetadata,
     error::Error,
-    header::{DEFAULT_MASK, HEADER_SIZE, parse_header},
+    header::{constants::*, parse_header},
+    version::Version,
 };
 
-pub fn parse(bytecode: &[u8]) -> Result<Container, Error> {
-    let header = parse_header(bytecode)?;
-
-    // if `Header::version` returns an error, bubble it up as an error
-    let _ = header.version()?;
-
-    if header.codesize() != bytecode.len() as u64 {
-        return Err(Error::BytecodeLength);
+pub fn parse(bytecode: &[u8]) -> Result<(), Error> {
+    if bytecode.len() < MIN_HEADER_SIZE
+        || bytecode[0] != MAGIC_BYTE_0
+        || bytecode[1] != MAGIC_BYTE_1
+    {
+        return Err(Error::NotEOF);
     }
 
-    let type_section = parse_types(header, bytecode)?;
+    let version = Version::try_from(bytecode[2])?;
 
-    // TODO: parse code and data section, validate
-}
-
-fn parse_header(raw: &[u8]) -> Result<Header, Error> {
-    let header = Header::from(raw);
-
-    return if header.0 & 0xff_u128 != 0 || header.0 & DEFAULT_MASK != DEFAULT_MASK {
+    if bytecode[3] != TYPE_SECTION_MARKER || bytecode[6] != CODE_SECTION_MARKER {
         return Err(Error::Header);
-    } else {
-        Ok(header)
-    }
-}
-
-fn parse_types(header: Header, raw: &[u8]) -> Result<TypeSection, Error> {
-    let type_section_slice = raw[HEADER_SIZE..HEADER_SIZE + header.type_section_size() as usize];
-
-    if type_section_slice.len() % 4 != 0 {
-        return Err(Error::TypeSection);
     }
 
-    let types_len = type_section_slice.len() / 4;
+    let type_section_size = u16::from_be_bytes(bytecode[4..6]);
+    let number_of_code_sections = u16::from_be_bytes(bytecode[6..8]);
 
-    let types: Vec<FunctionMetadata> = Vec::with_capacity(types_len);
+    let mut code_section_sizes = Vec::with_capacity(number_of_code_sections);
+    let mut index = 9;
 
-    for index in 0..types_len {
-        let start = index * 4;
-        let end = start + 4;
+    let end_code_seciton_sizes = number_of_code_sections * 2 + 9;
 
-        types.push(FunctionMetadata::from(&type_section_slice[start..end]));
+    while index < end_code_seciton_sizes {
+        code_section_sizes.push(u16::from_be_bytes(bytecode[index..index + 2]));
+
+        index += 2;
     }
 
-    Ok(TypeSection(types))
+    if bytecode[index] != DATA_SECTION_MARKER || bytecode[index + 3] != TERMINATOR {
+        return Err(Error::Header);
+    }
+
+    let data_section_size = u16::from_be_bytes(bytecode[index + 1..index + 3]);
+
+    // index now points to the end of the header
+    index += 4;
+
+    let expected_len = index + code_section_sizes.iter().sum::<u16>() + data_section_size as usize;
+
+    if bytecode.len() < expected_len {
+        return Err(Error::Header);
+    }
+
+    for code_section_size in code_section_sizes.iter() {
+        let code_section = &bytecode[index..index+code_section_size];
+
+        for opcode in code_section {
+            let op = opcode.into();
+        }
+    }
+
+    todo!()
 }
