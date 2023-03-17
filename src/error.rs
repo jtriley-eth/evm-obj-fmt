@@ -19,4 +19,6 @@ pub enum Error {
     CodeSectionMetadata,
     /// First Code Section MUST Have 0 Inputs and 0 Outputs
     FirstCodeSection,
+    /// Invalid OpCode
+    InvalidOpcode,
 }
