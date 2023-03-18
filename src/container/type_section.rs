@@ -15,32 +15,32 @@ pub struct TypeSection(Vec<FunctionMetadata>);
 pub struct FunctionMetadata(u32);
 
 impl FunctionMetadata {
-    pub fn input(self) -> u8 {
+    pub fn inputs(&self) -> u8 {
         (self.0 >> 24) as u8
     }
 
-    pub fn output(self) -> u8 {
+    pub fn outputs(&self) -> u8 {
         ((self.0 >> 16) & 0xff) as u8
     }
 
-    pub fn max_stack_height(self) -> u16 {
+    pub fn max_stack_height(&self) -> u16 {
         (self.0 & 0xffff) as u16
     }
 }
 
 impl<'a> From<&Function<'a>> for FunctionMetadata {
     fn from(value: &Function) -> Self {
-        Self(value.inputs() as u32) << 24
+        Self((value.inputs() as u32) << 24
             | (value.outputs() as u32) << 16
-            | (value.max_stack_height() as u32)
+            | (value.max_stack_height() as u32))
     }
 }
 
-impl From<&[u8]> for FunctionMetadata {
-    fn from(value: &[u8]) -> Self {
+impl From<[u8; 4]> for FunctionMetadata {
+    fn from(value: [u8; 4]) -> Self {
         // accounts for endianness on the `max_stack_height`
-        Self(value[0] as u32) << 24
+        Self((value[0] as u32) << 24
             | ((value[1] as u32) << 16)
-            | u32::from_be_bytes([value[2], value[3]])
+            | u32::from_be_bytes(value[2..4].try_into().unwrap()))
     }
 }

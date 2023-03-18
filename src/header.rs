@@ -1,6 +1,7 @@
-use crate::{error::Error, version::Version};
+use crate::version::Version;
 
 pub mod constants {
+    pub const HEADER_SIZE_NO_CODE_SECTIONS: usize = 13;
     pub const MIN_HEADER_SIZE: usize = 15;
     pub const MAGIC_BYTE_0: u8 = 0xef;
     pub const MAGIC_BYTE_1: u8 = 0x00;
@@ -8,6 +9,8 @@ pub mod constants {
     pub const CODE_SECTION_MARKER: u8 = 0x02;
     pub const DATA_SECTION_MARKER: u8 = 0x03;
     pub const TERMINATOR: u8 = 0x00;
+
+    pub const MAGIC: u16 = 0xef00;
 }
 
 pub struct Header {
@@ -51,6 +54,6 @@ impl Header {
 
     pub fn size(&self) -> usize {
         // 13 bytes + number of code sections * 2 bytes
-        constants::MIN_HEADER_SIZE - 2 + self.number_of_code_sections * 2
+        constants::MIN_HEADER_SIZE - 2 + self.number_of_code_sections as usize * 2
     }
 }
